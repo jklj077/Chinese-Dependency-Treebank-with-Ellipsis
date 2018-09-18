@@ -2,6 +2,7 @@ import os
 import sys
 
 from argparse import ArgumentParser
+from collections import Counter
 
 import requests
 
@@ -68,6 +69,103 @@ class Token(object):
         ])
 
 
+def check_dep_type(fp, type_='e2e'):
+    # file should not be augmented
+    sent = []
+    count = 0
+    total = 0
+
+    with open(fp, encoding='utf-8', mode='r') as fin:
+        for line in fin:
+            line = line.strip()
+            if line:
+                sent.append(Token(*line.split('\t')))
+            else:
+                if sent:
+                    matched = False
+                    for entry in sent:
+                        if entry.head == '0':
+                            continue
+                        head = sent[int(entry.head) - 1]
+                        if type_ == 'e2e' and entry.omit == 'I' and head.omit == 'I':
+                            matched = True
+                            print('{} -> {}'.format(head.form, entry.form))
+                        elif type_ == 'e2o' and entry.omit == 'O' and head.omit == 'I':
+                            matched = True
+                            print('{} -> {}'.format(head.form, entry.form))
+                        elif type_ == 'o2e' and entry.omit == 'I' and head.omit == 'O':
+                            matched = True
+                            print('{} -> {}'.format(head.form, entry.form))
+                        elif type_ == 'o2o' and entry.omit == 'O' and head.omit == 'O':
+                            matched = True
+                            print('{} -> {}'.format(head.form, entry.form))
+                    if matched:
+                        count += 1
+                    total += 1
+                    sent = []
+
+    print('matched ({}): {}/{}'.format(type_, count, total))
+
+
+mapping = {
+    'VA': 'ADJ',
+    'VC': 'AUX',
+    'VE': 'VERB',
+    'VV': 'VERB',
+    'NR': 'PROPN',
+    'NT': 'NOUN',
+    'NN': 'NOUN',
+    'PN': 'PRON',
+    'LC': 'ADP',
+    'DT': 'DET',
+    'CD': 'NUM',
+    'OD': 'ADJ',
+    'M': 'NOUN',
+    'AD': 'ADV',
+    'P': 'ADP',
+    'CC': 'CCONJ',
+    'CS': 'SCONJ',
+    'DEC': 'PART',
+    'DEG': 'PART',
+    'DER': 'PART',
+    'DEV': 'PART',
+    'SP': 'PART',
+    'AS': 'AUX',
+    'ETC': 'PART',
+    'MSP': 'PART',
+    'IJ': 'INTJ',
+    'ON': 'ADV',
+    'PU': 'PUNCT',
+    'JJ': 'ADJ',
+    'FW': 'X',
+    'LB': 'ADP',
+    'SB': 'AUX',
+    'BA': 'ADP'
+}
+
+
+def check_pos_type(fp, ud=False, type_='O'):
+    # file should be augmented
+    c = Counter()
+
+    with open(fp, encoding='utf-8', mode='r') as fin:
+        for line in fin:
+            line = line.strip()
+            if line and line[0] != '#':
+                parts = line.split('\t')
+                if parts[2] == type_:
+                    c.update([parts[-3] if not 
+                    
+                    ud else mapping[parts[-3]]])
+
+    print('POS ({})'.format(type_))
+    total = 0
+    for key, value in c.most_common():
+        print('{}:\t{}'.format(key, value))
+        total += value
+    print('total: {}'.format(total))
+
+
 def aug_sent(sent, nlp):
     sent_str = ' '.join([token.form for token in sent])
     res = nlp.annotate(sent_str)
@@ -123,7 +221,8 @@ def aug_file(fp, nlp):
 
 def main():
 
-    argparser = ArgumentParser(epilog=
+    argparser = ArgumentParser(
+        epilog=
         'You should check the VALIDITY of the arguments. The script does not check them, and will fail with no warning.'
     )
     argparser.add_argument(
@@ -142,8 +241,13 @@ def main():
     )
     args = argparser.parse_args()
 
-    nlp = StanfordCoreNLP(args.host, args.port)
-    aug_file(args.filepath, nlp)
+    # nlp = StanfordCoreNLP(args.host, args.port)
+    # aug_file(args.filepath, nlp)
+
+    # check_dep_type(args.filepath, type_='e2e')
+    # check_dep_type(args.filepath, type_='e2o')
+    check_pos_type(args.filepath, ud=True, type_='I')
+    check_pos_type(args.filepath, ud=True, type_='O')
 
 
 if __name__ == '__main__':
